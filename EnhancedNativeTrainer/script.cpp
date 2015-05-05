@@ -33,6 +33,12 @@ https://github.com/gtav-ent/GTAV-EnhancedNativeTrainer
 
 #pragma warning(disable : 4244 4305) // double <-> float conversions
 
+//Current Menu
+bool menuOpenPlayer = false;
+bool menuOpenSkinChange = false;
+bool menuOpenTeleport = false;
+bool menuOpenWantedLevel = false;
+
 // features
 bool featurePlayerInvincible			=	false;
 bool featurePlayerInvincibleUpdated		=	false;
@@ -585,11 +591,13 @@ bool process_wantedlevel_menu()
 
 int activeLineIndexPlayer = 0;
 
-void process_player_menu()
+bool process_player_menu()
 {
 	const float lineWidth = 250.0;
 	const int lineCount = 15;
-	
+
+	menuOpenPlayer = true;
+
 	std::string caption = "PLAYER  OPTIONS";
 
 	static struct {
@@ -613,6 +621,11 @@ void process_player_menu()
 		{"FAST RUN", &featurePlayerFastRun, &featurePlayerFastRunUpdated},
 		{"SUPER JUMP", &featurePlayerSuperJump, NULL}
 	};
+
+	//If any sub-menu was hidden
+	if (menuOpenWantedLevel){ menuOpenWantedLevel = process_wantedlevel_menu(); }
+	if (menuOpenSkinChange){ menuOpenSkinChange = process_skinchanger_menu(); }
+	if (menuOpenTeleport){ menuOpenTeleport = process_teleport_menu(-1); }
 
 	DWORD waitTime = 150;
 	while (true)
@@ -651,7 +664,7 @@ void process_player_menu()
 			{
 				// skin changer
 				case 0:
-					if (process_skinchanger_menu())	return;
+					menuOpenSkinChange = process_skinchanger_menu();
 					break;
 					/*
 				// skin changer
@@ -661,7 +674,7 @@ void process_player_menu()
 					*/
 				// teleport
 				case 1:
-					if (process_teleport_menu(-1)) return;
+					menuOpenTeleport = process_teleport_menu(-1);
 					break;
 				// fix player
 				case 2:
@@ -711,7 +724,7 @@ void process_player_menu()
 					break;
 				//Freeze Wanted Level
 				case 6:
-					if(process_wantedlevel_menu()) return;
+					menuOpenWantedLevel = process_wantedlevel_menu();
 					break;
 				// switchable features
 				default:
@@ -722,9 +735,14 @@ void process_player_menu()
 			}
 			waitTime = 200;
 		} else
-		if (bBack || trainer_switch_pressed())
+		if (bBack)
 		{
 			menu_beep();
+			menuOpenPlayer = false;
+			break;
+		} else
+		if (trainer_switch_pressed() || menuOpenWantedLevel || menuOpenSkinChange || menuOpenTeleport)
+		{
 			break;
 		} else
 		if (bUp)
@@ -744,6 +762,11 @@ void process_player_menu()
 			waitTime = 150;
 		}
 	}
+	std::string st;
+	if (menuOpenPlayer){ st = "True"; }
+	else{ st = "False"; }
+	set_status_text(st);
+	return menuOpenPlayer;
 }
 
 int activeLineIndexWeapon = 0;
@@ -1287,7 +1310,10 @@ int activeLineIndexMain = 0;
 void process_main_menu()
 {
 	const float lineWidth = 250.0;
-	const int lineCount = 7;	
+	const int lineCount = 7;
+
+	//Used to detirmine if Trainer Menu needs to be hidden
+	bool hideMenu = false;
 
 	std::string caption = "Enhanced Native Trainer";
 
@@ -1300,6 +1326,9 @@ void process_main_menu()
 		"WEATHER",
 		"MISC",
 	};
+
+	//If any sub-menu was hidden
+	if (menuOpenPlayer){ hideMenu = process_player_menu(); }
 
 	DWORD waitTime = 150;
 	while (true)
@@ -1329,7 +1358,7 @@ void process_main_menu()
 			switch (activeLineIndexMain)
 			{
 				case 0:
-					process_player_menu();					
+					hideMenu = process_player_menu();
 					break;
 				case 1:
 					process_weapon_menu();
@@ -1356,7 +1385,10 @@ void process_main_menu()
 		{
 			menu_beep();
 			break;
-		} else
+		} 
+		else
+		if (hideMenu){ break; }
+		else
 		if (bUp)
 		{
 			menu_beep();

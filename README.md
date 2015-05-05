@@ -2,6 +2,10 @@
 GTA V PC Enhanced Native Trainer, building on Alexander Blade's original sample.
 
 ##Features
+#### Functionality
+	* F4 - Hides the trainer menu. Pressing it again will return you to where you were. 
+	**Only implemented with the "Player" sub-menu. Re-draws previous menu before closing
+	(needs changing).
 #### Trainer Options
 	* Freeze Wanted Level - Prevents Wanted Stars from disappearing and keeps them at set level.
 	* Airbrake - Like with the GTAIV Native Trainer, you can use this to access hard 

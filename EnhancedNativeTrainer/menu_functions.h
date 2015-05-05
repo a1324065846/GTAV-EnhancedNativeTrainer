@@ -158,11 +158,18 @@ bool draw_generic_menu(std::vector<std::string> captions, std::vector<T> values,
 		}
 		else
 		{
-			if (bBack || trainer_switch_pressed())
+			if (bBack)
 			{
 				menu_beep();
 				waitTime = 200;
 				result = false;
+				break;
+			}
+			else if (trainer_switch_pressed())
+			{
+				menu_beep();
+				waitTime = 200;
+				result = true;
 				break;
 			}
 			else
