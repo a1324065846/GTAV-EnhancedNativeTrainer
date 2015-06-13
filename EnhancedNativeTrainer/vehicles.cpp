@@ -11,6 +11,7 @@ https://github.com/gtav-ent/GTAV-EnhancedNativeTrainer
 #include "vehicles.h"
 #include "menu_functions.h"
 #include "config_io.h"
+#include <vector>
 
 bool featureVehInvincible = false;
 bool featureVehInvincibleUpdated = false;
@@ -244,6 +245,13 @@ bool onconfirm_veh_menu(MenuItem<int> choice)
 	case 3:
 		if (process_veh_door_menu()) return false;
 		break;
+	case 8:
+		if (bPlayerExists)
+			if (PED::IS_PED_IN_ANY_VEHICLE(playerPed, 0))
+				process_carmod_menu();
+			else
+				set_status_text("Player not in Vehicle");
+		break;
 		// switchable features
 	default:
 		break;
@@ -253,7 +261,7 @@ bool onconfirm_veh_menu(MenuItem<int> choice)
 
 void process_veh_menu()
 {
-	const int lineCount = 8;
+	const int lineCount = 9;
 
 	std::string caption = "Vehicle Options";
 
@@ -265,7 +273,8 @@ void process_veh_menu()
 		{ "Wrap In Spawned", &featureVehWrapInSpawned, NULL, true },
 		{ "Invincible", &featureVehInvincible, &featureVehInvincibleUpdated, true },
 		{ "No Falling Off", &featureNoVehFallOff, &featureNoVehFallOffUpdated, true },
-		{ "Speed Boost", &featureVehSpeedBoost, NULL, true }
+		{ "Speed Boost", &featureVehSpeedBoost, NULL, true },
+		{ "Mod Selection", NULL, NULL, false }
 	};
 	draw_menu_from_struct_def(lines, lineCount, &activeLineIndexVeh, caption, onconfirm_veh_menu);
 }
@@ -374,6 +383,274 @@ bool process_carspawn_menu()
 	}
 
 	return draw_generic_menu<int>(menuItems, 0, "Vehicle Categories", onconfirm_carspawn_menu, NULL, NULL);
+}
+
+const std::vector<std::string> MENU_VEHICLE_MOD_CATEGORIES{ "Armour", "Brakes", "Front Bumper", "Rear Bumper", "Engine", "Exhaust", "Grille", "Hood", "Horn", "Lights", "Roof", "Skirts", "Spoiler", "Suspension", "Transmission", "Turbo", "Wheels", "Bulletproof Tyres", "Respray" };
+const std::vector<int> MENU_VEHICLE_MOD_CATEGORIES_VALUES{ 16, 12, 1, 2, 11, 4, 6, 7, 14, 22, 10, 3, 0, 15, 13, 18, 23, 90, 91 };
+const std::vector<std::string> MENU_VEHICLE_MOD_ARMOUR{ "Armour Upgrade 20%", "Armour Upgrade 40%", "Armour Upgrade 60%", "Armour Upgrade 80%", "Armour Upgrade 100%", "None" };
+const std::vector<std::string> MENU_VEHICLE_MOD_BRAKES{ "Street Brakes", "Sports Brakes", "Race Brakes", "Stock Brakes" };
+const std::vector<std::string> MENU_VEHICLE_MOD_ENGINE{ "EMS Upgrade Level 1", "EMS Upgrade Level 2", "EMS Upgrade Level 3", "EMS Upgrade Level 4" };
+const std::vector<std::string> MENU_VEHICLE_MOD_HORNS{ "Truck Horn", "Cop Horn", "Clown Horn", "Musical Horn 1", "Musical Horn 2", "Musical Horn 3", "Musical Horn 4", "Musical Horn 5", "Sad Trumbone", 
+"Classical Horn 1", "Classical Horn 2", "Classical Horn 3", "Classical Horn 4", "Classical Horn 5", "Classical Horn 6", "Classical Horn 7", "Do", "Re", "Mi", "Fa", "Sol", "La", "Ti", "Do(High)", 
+"Jazz Horn 1", "Jazz Horn 2", "Jazz Horn 3", "Jazz Horn Loop", "Star Spangled Banner 1", "Star Spangled Banner 2", "Star Spangled Banner 3", "Star Spangled Banner 4", "Stock Horn" };
+
+const std::vector<std::string> MENU_VEHICLE_MOD_SUSPENSION{ "Lowered Suspension", "Street Suspension", "Sport Suspension", "Competition Suspension", "Race Suspension" }; //Not Constant
+const std::vector<std::string> MENU_VEHICLE_MOD_TRANSMISSION{ "Street Transmission", "Sports Transmission", "Race Transmission", "Stock Transmission" };
+const std::vector<std::string> MENU_VEHICLE_MOD_PAINT_SECTION{ "Primary Color", "Seconday Color" };
+const std::vector<std::string> MENU_VEHICLE_MOD_PAINT_TYPE{ "Classic", "Metallic", "Pearl", "Matte", "Metal", "Chrome" };
+const std::vector<std::string> MENU_VEHICLE_MOD_PAINT_COLORS_NORMAL{ "Black", "Carbon Black", "Graphite", "Anthracite Black", "Black Steel", "Dark Steel", "Silver", "Bluish Silver", "Rolled Steel", 
+"Shadow SIlver", "Stone Silver", "Midnight Silver", "Cast Iron Silver", "Red", "Torino Red", "Formula Red", "Lava Red", "Blaze Red", "Grace Red", "Garnet Red", "Sunset Red", "Cabernet Red", "Wine Red", 
+"Candy Red", "Hot Pink", "Pfister Pink", "Salmon Pink", "Sunrise Orange", "Orange", "Bright Orange", "Gold", "Bronze", "Yellow", "Race Yellow", "Dew Yellow", "Dark Green", "Racing Green", "Sea Green", 
+"Olive Green", "Bright Green", "Gasoline Green", "Lime Green", "Midnight Blue", "Galaxy Blue", "Dark Blue", "Saxon Blue", "Blue", "Mariner Blue", "Harbor Blue", "Diamond Blue", "Surf Blue", "Nautical Blue", 
+"Racing Blue", "Ultra Blue", "Light Blue", "Chocolate Brown", "Bison Brown", "Creek Brown", "Feltzer Brown", "Maple Brown", "Beechwood Brown", "Sienna Brown", "Saddle Brown", "Moss Brown", "Woodbeech Brown", 
+"Straw Brown", "Bleached Brown", "Schafter Purple", "Spinnaker Purple", "Midnight Purple", "Bright Purple", "Cream", "Ice White", "Frost White" };
+
+const std::vector<std::string> MENU_VEHICLE_MOD_PAINT_COLORS_MATTE{ "Black", "Gray", "Light Gray", "Ice White", "Blue", "Dark Blue", "Midnight Blue", "Midnight Purple", "Shafter Purple", "Red", "Dark Red", 
+"Orange", "Yellow", "Lime Green", "Green", "Forest Green", "Foliage Green", "Olive Drab", "Dark Earth", "Desert Tan" };
+
+const std::vector<std::string> MENU_VEHICLE_MOD_PAINT_COLORS_METALS{ "Brushed Steel", "Brushed Black Steel", "Brushed Aluminium", "Pure Gold", "Brushed Gold" };
+
+int curCategory;
+int curPaintSection;
+
+//Gives selected upgrade
+void give_veh_upgrade(int upgradeType, int upgradeLevel)
+{
+	Ped playerPed = PLAYER::PLAYER_PED_ID();
+	Vehicle playerVeh = PED::GET_VEHICLE_PED_IS_USING(playerPed);
+	std::stringstream s; s << "Type: " << upgradeType << " level: " << upgradeLevel;
+
+	//Give custom wheels if wheel upgrade selected
+	if (upgradeType == 18){ set_status_text("Turbo"); VEHICLE::TOGGLE_VEHICLE_MOD(playerVeh, 18, upgradeLevel); }
+	else if (upgradeType == 22){ set_status_text("Xenon Lights"); VEHICLE::TOGGLE_VEHICLE_MOD(playerVeh, 22, upgradeLevel); }
+	else if (upgradeType == 23){ set_status_text("Wheels"); VEHICLE::SET_VEHICLE_MOD(playerVeh, 23, upgradeLevel, 0); }
+	else if (upgradeType == 90){ set_status_text("Bulletproof Tyres"); VEHICLE::SET_VEHICLE_TYRES_CAN_BURST(playerVeh, upgradeLevel); }
+	else{ set_status_text(s.str()); VEHICLE::SET_VEHICLE_MOD(playerVeh, upgradeType, upgradeLevel, 0); }
+	//set_status_text(s.str()); VEHICLE::SET_VEHICLE_MOD_KIT(playerVeh, 0); VEHICLE::SET_VEHICLE_MOD(playerVeh, upgradeType, upgradeLevel, 0);
+}
+
+//Sets Vehicle colors
+void give_veh_body_color(int section, int paintType, int color)
+{
+	Ped playerPed = PLAYER::PLAYER_PED_ID();
+	Vehicle playerVeh = PED::GET_VEHICLE_PED_IS_USING(playerPed);
+
+	if (section == 0){ VEHICLE::SET_VEHICLE_MOD_COLOR_1(playerVeh, paintType, color, 1); }
+	else{ VEHICLE::SET_VEHICLE_MOD_COLOR_2(playerVeh, paintType, color); }
+}
+
+bool onconfirm_carmod_respray_colors(MenuItem<int> choice)
+{
+	give_veh_body_color(curPaintSection, choice.value, choice.currentMenuIndex);
+	return false;
+}
+
+bool process_carmod_respray_colors(int choice)
+{
+	std::vector<MenuItem<int>*> menuItems;
+	std::vector<std::string> objects;
+
+	switch (choice)
+	{
+		case 0:
+		case 1:
+		case 2:
+			objects = MENU_VEHICLE_MOD_PAINT_COLORS_NORMAL; break;
+		case 3:
+			objects = MENU_VEHICLE_MOD_PAINT_COLORS_MATTE; break;
+		case 4:
+			objects = MENU_VEHICLE_MOD_PAINT_COLORS_METALS; break;
+		case 5:
+			objects.push_back("Chrome"); break;
+	}
+
+	for (int i = 0; i < objects.size(); i++)
+	{
+		MenuItem<int> *item = new MenuItem<int>();
+		item->caption = objects[i];
+		item->value = choice;
+		item->isLeaf = false;
+		menuItems.push_back(item);
+	}
+
+	return draw_generic_menu<int>(menuItems, 0, "Colors", onconfirm_carmod_respray_colors, NULL, NULL);
+}
+
+bool onconfirm_carmod_respray_menu(MenuItem<int> choice)
+{
+	//give_veh_body_color(choice.value, choice.currentMenuIndex, rand() % 70);
+	process_carmod_respray_colors(choice.currentMenuIndex);
+	return false;
+}
+
+bool process_carmod_respray_menu(int section)
+{
+	std::vector<MenuItem<int>*> menuItems;
+	curPaintSection = section;
+
+	for (int i = 0; i < MENU_VEHICLE_MOD_PAINT_TYPE.size(); i++)
+	{
+		MenuItem<int> *item = new MenuItem<int>();
+		item->caption = MENU_VEHICLE_MOD_PAINT_TYPE[i];
+		item->value = curPaintSection;
+		item->isLeaf = false;
+		menuItems.push_back(item);
+	}
+
+	return draw_generic_menu<int>(menuItems, 0, "Paint Types", onconfirm_carmod_respray_menu, NULL, NULL);
+}
+
+bool onconfirm_carmod_options(MenuItem<int> choice)
+{
+	if (curCategory == 91){ process_carmod_respray_menu(choice.currentMenuIndex); }
+	else{ give_veh_upgrade(curCategory, choice.value); }
+	return false;
+}
+
+//Determines what mod options to show
+bool process_carmod_options(int category)
+{
+	Ped playerPed = PLAYER::PLAYER_PED_ID();
+	Vehicle playerVeh = PED::GET_VEHICLE_PED_IS_USING(playerPed);
+
+	int pos = std::find(MENU_VEHICLE_MOD_CATEGORIES_VALUES.begin(), MENU_VEHICLE_MOD_CATEGORIES_VALUES.end(), category) - MENU_VEHICLE_MOD_CATEGORIES_VALUES.begin();
+	curCategory = category;
+	int numMods = VEHICLE::GET_NUM_VEHICLE_MODS(playerVeh, curCategory);
+
+	std::vector<MenuItem<int>*> menuItems;
+	std::vector<std::string> objects;
+
+	/*std::stringstream s; s << MENU_VEHICLE_MOD_CATEGORIES[category] << " Options: " << VEHICLE::GET_NUM_VEHICLE_MODS(playerVeh, MENU_VEHICLE_MOD_CATEGORIES_VALUES[category]) << " gName: " << VEHICLE::GET_MOD_SLOT_NAME(playerVeh, curCategory);
+	set_status_text(s.str());
+	for (int i = 0; i < numMods; i++)
+	{
+		std::stringstream s; s << VEHICLE::GET_MOD_SLOT_NAME(playerVeh, curCategory);
+		objects.push_back(s.str());
+	}*/
+
+	//Tried to use this to get part names, returns numbers with stringstream
+	//and broken characters with string.
+	//for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << VEHICLE::GET_MOD_TEXT_LABEL(playerVeh, curCategory, i); objects.push_back(ss.str()); }
+
+	switch (curCategory)
+	{
+	case 0://Spoiler
+		for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << "Spoiler " << (int)(i+1); objects.push_back(ss.str()); }
+		objects.push_back("None");
+		break;
+	case 1:
+		for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << "Front Bumper " << (int) (i + 1); objects.push_back(ss.str()); }
+		objects.push_back("Stock Front Bumper");
+		break;
+	case 2:
+		for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << "Rear Bumper " << (int) (i + 1); objects.push_back(ss.str()); }
+		objects.push_back("Stock Rear Bumper");
+		break;
+	case 3: //Skirts
+		for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << "Side Skirt " << (int) (i + 1); objects.push_back(ss.str()); }
+		objects.push_back("None");
+		break;
+	case 4:
+		for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << "Exhaust " << (int) (i + 1); objects.push_back(ss.str()); }
+		objects.push_back("Stock Exhaust");
+		break;
+	case 6:
+		for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << "Grille " << (int) (i + 1); objects.push_back(ss.str()); }
+		objects.push_back("Stock Grille");
+		break;
+	case 7:
+		for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << "Hood " << (int) (i + 1); objects.push_back(ss.str()); }
+		objects.push_back("Stock Hood");
+		break;
+	case 10:
+		for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << "Roof " << (int) (i + 1); objects.push_back(ss.str()); }
+		objects.push_back("Stock Roof");
+		break;
+	case 11:
+		objects = MENU_VEHICLE_MOD_ENGINE;
+		break;
+	case 12:
+		objects = MENU_VEHICLE_MOD_BRAKES;
+		break;
+	case 13:
+		objects = MENU_VEHICLE_MOD_TRANSMISSION;
+		break;
+	case 14:
+		objects = MENU_VEHICLE_MOD_HORNS;
+		break;
+	case 15:
+		for (int i = 0; i < numMods; i++){ objects.push_back(MENU_VEHICLE_MOD_SUSPENSION[i]); }
+		objects.push_back("Stock Suspension");
+		break;
+	case 16:
+		objects = MENU_VEHICLE_MOD_ARMOUR;
+		break;
+	case 18:
+		objects.push_back("None"); objects.push_back("Turbo Tuning");
+		break;
+	case 22:
+		objects.push_back("Stock Lights"); objects.push_back("Xenon Lights");
+		break;
+	case 23: //Wheels (Front for bikes)
+		for (int i = 0; i < numMods; i++){ std::stringstream ss; ss << "Wheel " << (int) (i + 1); objects.push_back(ss.str()); }
+		break;
+	case 90: //Bulletproof Tyres
+		objects.push_back("On"); objects.push_back("Off");
+		break;
+	case 91: //Respray
+		objects.push_back("Primary Color");
+		objects.push_back("Secondary Color");
+		//if (VEHICLE::_DOES_VEHICLE_HAVE_SECONDARY_COLOUR(playerVeh)){ objects.push_back("Secondary Color"); }
+		break;
+	default:
+		break;
+	}
+
+	for (int i = 0; i < objects.size(); i++)
+	{
+		MenuItem<int> *item = new MenuItem<int>();
+		item->caption = objects[i];
+		item->value = i;
+		item->isLeaf = false;
+		menuItems.push_back(item);
+	}
+	if (objects.size() > 0){ return draw_generic_menu<int>(menuItems, 0, MENU_VEHICLE_MOD_CATEGORIES[pos], onconfirm_carmod_options, NULL, NULL); }
+	return false;
+}
+
+//Moves to display mod options when category is selected
+bool onconfirm_carmod_menu(MenuItem<int> choice)
+{
+	process_carmod_options(choice.value);
+	return false;
+}
+
+//Displays mod categories menu
+bool process_carmod_menu()
+{
+	Ped playerPed = PLAYER::PLAYER_PED_ID();
+	Vehicle playerVeh = PED::GET_VEHICLE_PED_IS_USING(playerPed);
+
+	VEHICLE::SET_VEHICLE_MOD_KIT(playerVeh, 0);
+
+	std::vector<MenuItem<int>*> menuItems;
+	for (int i = 0; i < MENU_VEHICLE_MOD_CATEGORIES.size(); i++)
+	{
+		MenuItem<int> *item = new MenuItem<int>();
+		if (MENU_VEHICLE_MOD_CATEGORIES[i] == "Turbo" || MENU_VEHICLE_MOD_CATEGORIES[i] == "Lights" || MENU_VEHICLE_MOD_CATEGORIES[i] == "Respray" || MENU_VEHICLE_MOD_CATEGORIES[i] == "Bulletproof Tyres" || VEHICLE::GET_NUM_VEHICLE_MODS(playerVeh, MENU_VEHICLE_MOD_CATEGORIES_VALUES[i])>0)
+		{
+			item->caption = MENU_VEHICLE_MOD_CATEGORIES[i];
+			item->value = MENU_VEHICLE_MOD_CATEGORIES_VALUES[i];
+			item->isLeaf = false;
+			menuItems.push_back(item);
+		}
+	}
+	if (menuItems.size() == 0)
+	{
+		set_status_text("This vehicle cannot be modified.");
+		return false;
+	}
+	else{ return draw_generic_menu<int>(menuItems, 0, "Vehicle Mod Categories", onconfirm_carmod_menu, NULL, NULL); }
 }
 
 bool onconfirm_spawn_menu_cars(MenuItem<int> choice)

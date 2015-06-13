@@ -686,7 +686,7 @@ bool onconfirm_player_menu(MenuItem<int> choice)
 		}
 		set_status_text("Cash Added");
 		break;
-		// wanted up or down, handled by item
+	// wanted up or down, handled by item
 	case 3:
 		break;
 	default:
